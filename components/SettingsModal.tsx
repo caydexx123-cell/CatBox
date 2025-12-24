@@ -30,9 +30,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ settings, onUpdateSetting
       onUpdateSettings({ ...settings, textStyle: style });
   };
 
+  const toggleFps = () => {
+    onUpdateSettings({ ...settings, optimizeFps: !settings.optimizeFps });
+  };
+
   return (
     <div className="absolute inset-0 z-[70] bg-black/80 backdrop-blur-md flex items-center justify-center p-6 animate-fade-in">
-      <div className="w-full max-w-md bg-catbox-panel border border-white/10 rounded-3xl p-6 shadow-2xl space-y-8 max-h-[90vh] overflow-y-auto">
+      <div className="w-full max-w-md bg-catbox-panel border border-white/10 rounded-3xl p-6 shadow-2xl space-y-8 max-h-[90vh] overflow-y-auto custom-scrollbar">
         
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-black text-white flex items-center gap-2">
@@ -42,6 +46,31 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ settings, onUpdateSetting
           <button onClick={onClose} className="p-2 bg-white/10 rounded-full hover:bg-white/20">
             <Icons.X size={20} />
           </button>
+        </div>
+
+        {/* FPS / Performance Section */}
+        <div className="space-y-4">
+           <div>
+             <label className="text-xs text-gray-400 font-bold uppercase tracking-widest">{t.opt_title}</label>
+             <p className="text-[10px] text-gray-500 mt-1">{t.opt_desc}</p>
+           </div>
+           
+           <button 
+             onClick={toggleFps}
+             className={`w-full p-4 rounded-xl border flex items-center justify-between transition-all duration-300 ${
+                 settings.optimizeFps 
+                 ? 'bg-yellow-500/20 border-yellow-500 shadow-[0_0_20px_rgba(234,179,8,0.4)]' 
+                 : 'bg-white/5 border-white/5 text-gray-500 hover:bg-white/10'
+             }`}
+           >
+              <div className="flex items-center gap-3">
+                 <Icons.Zap size={24} className={settings.optimizeFps ? 'text-yellow-400 fill-current' : 'text-gray-600'} />
+                 <span className={`font-bold ${settings.optimizeFps ? 'text-yellow-100' : 'text-gray-400'}`}>{t.opt_fps}</span>
+              </div>
+              <div className={`w-12 h-6 rounded-full p-1 transition-colors ${settings.optimizeFps ? 'bg-yellow-500' : 'bg-gray-700'}`}>
+                  <div className={`w-4 h-4 bg-white rounded-full shadow-md transform transition-transform ${settings.optimizeFps ? 'translate-x-6' : 'translate-x-0'}`}></div>
+              </div>
+           </button>
         </div>
 
         {/* Language Section */}

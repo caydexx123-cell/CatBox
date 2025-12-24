@@ -10,7 +10,7 @@ interface ToolsPanelProps {
   onRedo?: () => void;
   onClear: () => void;
   isPhotoMode?: boolean;
-  onSave?: () => void;
+  onSave?: (snapshotUrl?: string) => void;
   onOpenColorPicker: () => void;
   lang: Language;
 }
@@ -33,7 +33,7 @@ const ToolsPanel: React.FC<ToolsPanelProps> = ({
   };
 
   return (
-    <div className="bg-catbox-panel/95 backdrop-blur-2xl border-t border-white/20 shadow-[0_-10px_40px_rgba(0,0,0,0.6)] relative z-50 flex flex-col rounded-t-2xl overflow-hidden pb-[env(safe-area-inset-bottom)]">
+    <div className="bg-catbox-panel/95 backdrop-blur-2xl border-t border-white/20 shadow-[0_-10px_40px_rgba(0,0,0,0.6)] relative z-50 flex flex-col rounded-t-2xl overflow-hidden pb-[env(safe-area-inset-bottom)] transition-all duration-300">
       
       {/* Drag Handle */}
       <div className="w-full flex justify-center pt-2 pb-1">
@@ -43,7 +43,7 @@ const ToolsPanel: React.FC<ToolsPanelProps> = ({
       <div className="px-3 py-1 pb-4 space-y-2">
         
         {/* ROW 1: TOOLS & COLOR */}
-        <div className="flex items-center gap-2 h-11">
+        <div className="flex items-center gap-2 h-10 md:h-11">
             {/* Tools Group */}
             <div className="flex-1 grid grid-cols-3 gap-1 h-full">
                 <button
@@ -86,7 +86,7 @@ const ToolsPanel: React.FC<ToolsPanelProps> = ({
             {/* Color Picker Button */}
             <button 
                 onClick={onOpenColorPicker}
-                className="w-11 h-11 rounded-full flex items-center justify-center bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4IiBoZWlnaHQ9IjgiPjxyZWN0IHdpZHRoPSI4IiBoZWlnaHQ9IjgiIGZpbGw9IiM1NTUiLz48cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjNzc3Ii8+PHJlY3QgeD0iNCIgeT0iNCIgd2lkdGg9IjQiIGhlaWdodD0iNCIgZmlsbD0iIzc3NyIvPjwvc3ZnPg==')] border-2 border-white/20 shrink-0 relative overflow-hidden active:scale-95 transition-transform shadow-md"
+                className="w-10 h-10 md:w-11 md:h-11 rounded-full flex items-center justify-center bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4IiBoZWlnaHQ9IjgiPjxyZWN0IHdpZHRoPSI4IiBoZWlnaHQ9IjgiIGZpbGw9IiM1NTUiLz48cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjNzc3Ii8+PHJlY3QgeD0iNCIgeT0iNCIgd2lkdGg9IjQiIGhlaWdodD0iNCIgZmlsbD0iIzc3NyIvPjwvc3ZnPg==')] border-2 border-white/20 shrink-0 relative overflow-hidden active:scale-95 transition-transform shadow-md"
             >
                 <div 
                     className="absolute inset-0 transition-all duration-300"
@@ -149,7 +149,7 @@ const ToolsPanel: React.FC<ToolsPanelProps> = ({
             {/* Photo Mode: Save (Check) */}
             {isPhotoMode && onSave && (
                 <button 
-                    onClick={onSave}
+                    onClick={() => onSave()}
                     className="w-10 h-full rounded-lg bg-green-500 border border-green-400 flex items-center justify-center text-white shadow-lg active:scale-95"
                 >
                     <Icons.Check size={18} />

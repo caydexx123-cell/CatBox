@@ -11,12 +11,14 @@ interface CanvasEditorProps {
   onUpdateFrame: (data: string) => void;
   isInteracting: (active: boolean) => void;
   isPlaying?: boolean;
+  optimizeFps?: boolean; // New prop
 }
 
 export interface CanvasEditorHandle {
   undo: () => void;
   redo: () => void;
   clear: () => void;
+  getSnapshot: () => Promise<string>;
 }
 
 const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(({
@@ -26,7 +28,8 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(({
   drawingState,
   onUpdateFrame,
   isInteracting,
-  isPlaying = false
+  isPlaying = false,
+  optimizeFps = false
 }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -38,7 +41,7 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(({
   const [history, setHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
 
-  // Expose undo/redo/clear to parent
+  // Expose methods to parent
   useImperativeHandle(ref, () => ({
     undo: () => {
       if (historyIndex > 0) {
@@ -46,7 +49,6 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(({
         setHistoryIndex(newIndex);
         loadFromHistory(history[newIndex]);
       } else if (historyIndex === 0) {
-        // Clear if at start
         setHistoryIndex(-1);
         const canvas = canvasRef.current;
         const ctx = canvas?.getContext('2d');
@@ -66,15 +68,32 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(({
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
         ctx?.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-        
-        // Force reset interaction state
         setIsDrawing(false);
         lastPos.current = null;
-        
-        // Explicitly clear history and parent state
         setHistory([]);
         setHistoryIndex(-1);
-        onUpdateFrame(''); // Send empty string to signify deleted frame
+        onUpdateFrame(''); 
+    },
+    getSnapshot: async () => {
+        // Create a temporary canvas to composite the white background
+        // This fixes the "Black Screen" issue on mobile galleries
+        const canvas = canvasRef.current;
+        if (!canvas) return '';
+        
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = CANVAS_SIZE;
+        tempCanvas.height = CANVAS_SIZE;
+        const tCtx = tempCanvas.getContext('2d');
+        if (!tCtx) return '';
+
+        // 1. Fill White
+        tCtx.fillStyle = '#ffffff';
+        tCtx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+        // 2. Draw current canvas on top
+        tCtx.drawImage(canvas, 0, 0);
+
+        return tempCanvas.toDataURL('image/jpeg', 0.9);
     }
   }));
 
@@ -83,21 +102,15 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(({
     if (!canvas) return;
     const dataUrl = canvas.toDataURL();
 
-    // If we are in the middle of history and draw, cut off the future
     const newHistory = history.slice(0, historyIndex + 1);
     newHistory.push(dataUrl);
 
-    // Limit history size for performance
-    if (newHistory.length > 20) {
-        newHistory.shift();
-    }
+    if (newHistory.length > 20) newHistory.shift();
 
     setHistory(newHistory);
     setHistoryIndex(newHistory.length - 1);
 
-    if (shouldUpdateParent) {
-        onUpdateFrame(dataUrl);
-    }
+    if (shouldUpdateParent) onUpdateFrame(dataUrl);
   };
 
   const loadFromHistory = (dataUrl: string) => {
@@ -115,14 +128,26 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(({
     img.src = dataUrl;
   };
 
-  // Initialize or update canvas when frame changes externally (e.g. timeline click)
+  // --- OPTIMIZATION LOGIC ---
+  // If optimizeFps is true:
+  // 1. desynchronized: true (reduces latency)
+  // 2. willReadFrequently: false (removes overhead for reading, speeds up drawing, slows down floodfill)
+  
+  const getContextOptions = (): CanvasRenderingContext2DSettings => {
+      if (optimizeFps) {
+          return { desynchronized: true, alpha: true };
+      }
+      return { willReadFrequently: true, alpha: true };
+  };
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    
+    // Use proper context settings based on FPS mode
+    const ctx = canvas.getContext('2d', getContextOptions());
     if (!ctx) return;
 
-    // Check if the incoming frame is empty
     if (!currentFrameData || currentFrameData.length === 0) {
         ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
         setHistory([]);
@@ -133,19 +158,18 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(({
 
     const currentHistoryTip = historyIndex >= 0 ? history[historyIndex] : '';
     
-    // Check if frame changed and it's not the one we just drew (avoid loops)
     if (currentFrameData !== currentHistoryTip) {
         ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
+        
+        // Disable smoothing in optimized mode for sharper, faster pixel rendering
+        ctx.imageSmoothingEnabled = !optimizeFps; 
+        if (!optimizeFps) ctx.imageSmoothingQuality = 'high';
 
         if (currentFrameData && currentFrameData.length > 10) {
-            // Only show loader if NOT playing to prevent flicker
             if (!isPlaying) setIsLoadingImage(true);
             
             const img = new Image();
             img.onload = () => {
-                // Contain Scale Logic
                 const scale = Math.min(CANVAS_SIZE / img.width, CANVAS_SIZE / img.height);
                 const drawWidth = img.width * scale;
                 const drawHeight = img.height * scale;
@@ -156,7 +180,6 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(({
                 ctx.drawImage(img, x, y, drawWidth, drawHeight);
                 setIsLoadingImage(false);
                 
-                // Initialize history with this frame if we stopped playing or just landed here
                 if (!isPlaying) {
                     const newData = canvas.toDataURL();
                     setHistory([newData]);
@@ -168,7 +191,7 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(({
             img.src = currentFrameData;
         }
     }
-  }, [currentFrameData, isPlaying]);
+  }, [currentFrameData, isPlaying, optimizeFps]); // Re-run if optimizeFps changes (parent key change handles context reset usually)
 
   const startDrawing = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -178,12 +201,13 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(({
     setIsDrawing(true);
     isInteracting(true);
 
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', getContextOptions());
     if (!ctx) return;
 
     const { x, y } = getCoordinates(e, canvas);
 
     if (drawingState.tool === 'fill') {
+      // Warn user or handle slow fill if optimized
       floodFill(ctx, x, y, drawingState.color);
       saveToHistory();
       setIsDrawing(false); 
@@ -210,72 +234,80 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const ctx = canvas.getContext('2d');
+    // In optimized mode, we don't need 'willReadFrequently'
+    const ctx = canvas.getContext('2d'); 
     if (!ctx) return;
 
-    const { x, y } = getCoordinates(e, canvas);
+    // Coalesced events help get smoother lines on high refresh rate screens
+    // but can add CPU load. We iterate them if needed.
+    const events = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
 
-    ctx.beginPath();
-    ctx.moveTo(lastPos.current.x, lastPos.current.y);
-    ctx.lineTo(x, y);
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.lineWidth = drawingState.brushSize;
+    for (const event of events) {
+        const { x, y } = getCoordinates(event, canvas);
 
-    if (drawingState.tool === 'eraser') {
-      ctx.globalCompositeOperation = 'destination-out';
-      ctx.strokeStyle = 'rgba(0,0,0,1)'; 
-    } else {
-      ctx.strokeStyle = drawingState.color;
+        ctx.beginPath();
+        ctx.moveTo(lastPos.current.x, lastPos.current.y);
+        ctx.lineTo(x, y);
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.lineWidth = drawingState.brushSize;
+
+        if (drawingState.tool === 'eraser') {
+          ctx.globalCompositeOperation = 'destination-out';
+          ctx.strokeStyle = 'rgba(0,0,0,1)'; 
+        } else {
+          ctx.strokeStyle = drawingState.color;
+        }
+
+        ctx.stroke();
+        ctx.globalCompositeOperation = 'source-over';
+
+        lastPos.current = { x, y };
     }
-
-    ctx.stroke();
-    ctx.globalCompositeOperation = 'source-over';
-
-    lastPos.current = { x, y };
   };
 
   const stopDrawing = () => {
-    if (isDrawing) {
-      saveToHistory();
-    }
+    if (isDrawing) saveToHistory();
     setIsDrawing(false);
     isInteracting(false);
     lastPos.current = null;
   };
 
   return (
-    <div ref={containerRef} className="relative w-full aspect-square max-w-[500px] shadow-2xl rounded-3xl overflow-hidden bg-white border-4 border-catbox-panel/50">
-      <div 
-        className="absolute inset-0 z-0 pointer-events-none opacity-20"
-        style={{
-          backgroundImage: `linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%)`,
-          backgroundSize: '20px 20px',
-          backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px'
-        }}
-      />
-      {isLoadingImage && !isPlaying && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center bg-white/50 backdrop-blur-sm">
-             <Icons.Sparkles className="animate-spin text-catbox-accent" size={32} />
-          </div>
-      )}
-      {onionSkinEnabled && previousFrameData && (
-        <img
-          src={previousFrameData}
-          alt="Onion Skin"
-          className="absolute inset-0 w-full h-full z-10 pointer-events-none opacity-30 mix-blend-multiply filter grayscale object-contain"
+    // Updated container to use w-full h-full and object-contain to prevent overflow on mobile
+    <div ref={containerRef} className="relative w-full h-full flex items-center justify-center p-2 md:p-4">
+      <div className="relative aspect-square w-full max-w-[500px] max-h-full shadow-2xl rounded-3xl overflow-hidden bg-white border-4 border-catbox-panel/50 flex-shrink-0">
+        <div 
+            className="absolute inset-0 z-0 pointer-events-none opacity-20"
+            style={{
+            backgroundImage: `linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%)`,
+            backgroundSize: '20px 20px',
+            backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px'
+            }}
         />
-      )}
-      <canvas
-        ref={canvasRef}
-        width={CANVAS_SIZE}
-        height={CANVAS_SIZE}
-        className="absolute inset-0 w-full h-full z-20 touch-none cursor-crosshair"
-        onPointerDown={startDrawing}
-        onPointerMove={draw}
-        onPointerUp={stopDrawing}
-        onPointerLeave={stopDrawing}
-      />
+        {isLoadingImage && !isPlaying && (
+            <div className="absolute inset-0 z-50 flex items-center justify-center bg-white/50 backdrop-blur-sm">
+                <Icons.Sparkles className="animate-spin text-catbox-accent" size={32} />
+            </div>
+        )}
+        {onionSkinEnabled && previousFrameData && (
+            <img
+            src={previousFrameData}
+            alt="Onion Skin"
+            className="absolute inset-0 w-full h-full z-10 pointer-events-none opacity-30 mix-blend-multiply filter grayscale object-contain"
+            />
+        )}
+        <canvas
+            ref={canvasRef}
+            width={CANVAS_SIZE}
+            height={CANVAS_SIZE}
+            className="absolute inset-0 w-full h-full z-20 touch-none cursor-crosshair"
+            onPointerDown={startDrawing}
+            onPointerMove={draw}
+            onPointerUp={stopDrawing}
+            onPointerLeave={stopDrawing}
+        />
+      </div>
     </div>
   );
 });

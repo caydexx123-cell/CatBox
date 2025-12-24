@@ -9,23 +9,35 @@ export const exportToVideo = async (frames: string[], fps: number): Promise<stri
   const ctx = canvas.getContext('2d');
   if (!ctx) return null;
 
-  // Use a white background for the video
+  // Helper to draw frame with white background to prevent "black screen" effect
   const drawFrame = (frameData: string) => {
     return new Promise<void>((resolve) => {
-      const img = new Image();
-      img.onload = () => {
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-        ctx.drawImage(img, 0, 0);
-        resolve();
-      };
-      img.src = frameData;
+      // 1. Fill white background first (paper look)
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+      // 2. If frame has data, draw it on top
+      if (frameData && frameData.length > 100) {
+        const img = new Image();
+        img.onload = () => {
+          ctx.drawImage(img, 0, 0);
+          resolve();
+        };
+        img.onerror = () => {
+             // If image fails, just resolve with white background
+             resolve();
+        }
+        img.src = frameData;
+      } else {
+          resolve();
+      }
     });
   };
 
   const stream = canvas.captureStream(fps);
   const mediaRecorder = new MediaRecorder(stream, {
-    mimeType: 'video/webm;codecs=vp9'
+    mimeType: 'video/webm;codecs=vp9',
+    videoBitsPerSecond: 2500000 // Higher bitrate for quality
   });
 
   const chunks: Blob[] = [];
@@ -44,11 +56,9 @@ export const exportToVideo = async (frames: string[], fps: number): Promise<stri
 
     // Loop through frames once to record
     for (const frame of frames) {
-      if (frame) {
         await drawFrame(frame);
-        // Wait for the duration of one frame
+        // Wait for the duration of one frame precisely
         await new Promise(r => setTimeout(r, 1000 / fps));
-      }
     }
 
     mediaRecorder.stop();

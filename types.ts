@@ -1,3 +1,4 @@
+
 export type ToolType = 'brush' | 'eraser' | 'fill';
 
 export type AppMode = 'home' | 'animation' | 'photo' | 'ai-chat' | 'gallery' | 'send' | 'settings';
@@ -39,6 +40,7 @@ export interface User {
 export interface AppSettings {
   language: Language;
   textStyle: TextStyle;
+  optimizeFps: boolean; // NEW: FPS Boost setting
   aiModels: {
     photo: boolean;
     video: boolean;

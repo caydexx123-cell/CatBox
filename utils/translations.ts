@@ -1,3 +1,4 @@
+
 import { Language } from '../types';
 
 export const translations = {
@@ -49,7 +50,10 @@ export const translations = {
     text_style: 'Стиль Текста',
     style_default: 'Обычный',
     style_minecraft: 'Minecraft',
-    style_anime: 'Anime'
+    style_anime: 'Anime',
+    opt_title: 'Производительность',
+    opt_fps: 'FPS Boost (Меньше лагов)',
+    opt_desc: 'Включите, если рисование тормозит. (Заливка может стать медленнее)'
   },
   en: {
     app_title: 'Animation Studio',
@@ -99,7 +103,10 @@ export const translations = {
     text_style: 'Text Style',
     style_default: 'Default',
     style_minecraft: 'Minecraft',
-    style_anime: 'Anime'
+    style_anime: 'Anime',
+    opt_title: 'Performance',
+    opt_fps: 'FPS Boost (Reduce Lag)',
+    opt_desc: 'Enable if drawing feels slow. (Fill tool might be slower)'
   },
   zh: {
     app_title: '动画工作室',
@@ -149,6 +156,9 @@ export const translations = {
     text_style: '文本样式',
     style_default: '默认',
     style_minecraft: 'Minecraft',
-    style_anime: '动漫'
+    style_anime: '动漫',
+    opt_title: '性能',
+    opt_fps: 'FPS 提升 (减少延迟)',
+    opt_desc: '如果绘图感觉缓慢，请启用。（填充工具可能会变慢）'
   }
 };
