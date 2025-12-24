@@ -15,11 +15,16 @@ const Gallery: React.FC<GalleryProps> = ({ items, onClose, onSendToAnimation, on
   const t = translations[lang];
   const [selectedItem, setSelectedItem] = useState<GalleryItem | null>(null);
 
-  const downloadFile = (item: GalleryItem) => {
+  const handleDownloadClick = (item: GalleryItem) => {
       const a = document.createElement('a');
       a.href = item.dataUrl;
-      const ext = item.type === 'video-gen' ? 'mp4' : 'png';
-      a.download = `catbox_${item.id}.${ext}`;
+      
+      if (item.type === 'video-gen') {
+          a.download = `catbox_${item.id}.mp4`; // Always name it mp4 for user
+      } else {
+          a.download = `catbox_${item.id}.png`; // Always png
+      }
+      
       a.click();
   };
 
@@ -90,10 +95,10 @@ const Gallery: React.FC<GalleryProps> = ({ items, onClose, onSendToAnimation, on
               <div className="space-y-3">
                   <div className="flex gap-2 mb-4">
                       <button 
-                        onClick={() => downloadFile(selectedItem)}
+                        onClick={() => handleDownloadClick(selectedItem)}
                         className="flex-1 py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-sm flex items-center justify-center gap-2"
                       >
-                          <Icons.Download size={16} /> {t.download} {selectedItem.type === 'video-gen' ? 'MP4' : 'PNG'}
+                          <Icons.Download size={16} /> {t.download}
                       </button>
                   </div>
 

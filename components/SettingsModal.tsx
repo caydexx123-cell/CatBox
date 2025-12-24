@@ -75,6 +75,33 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ settings, onUpdateSetting
            </a>
         </div>
 
+        {/* SEND Mode Section (Warning added) */}
+        <div className="space-y-4">
+           <div>
+             <label className="text-xs text-gray-400 font-bold uppercase tracking-widest">{t.send_mode_title}</label>
+             <p className="text-[10px] text-red-400 mt-1 font-bold bg-red-900/20 p-2 rounded-lg border border-red-500/20">
+                ⚠️ {t.send_mode_warn}
+             </p>
+           </div>
+           
+           <button 
+             onClick={() => onUpdateSettings({ ...settings, enableSend: !settings.enableSend })}
+             className={`w-full p-4 rounded-xl border flex items-center justify-between transition-all duration-300 ${
+                 settings.enableSend 
+                 ? 'bg-green-500/20 border-green-500 shadow-[0_0_20px_rgba(34,197,94,0.4)]' 
+                 : 'bg-white/5 border-white/5 text-gray-500 hover:bg-white/10'
+             }`}
+           >
+              <div className="flex items-center gap-3">
+                 <Icons.Wifi size={24} className={settings.enableSend ? 'text-green-400 fill-current' : 'text-gray-600'} />
+                 <span className={`font-bold ${settings.enableSend ? 'text-green-100' : 'text-gray-400'}`}>SEND (Multiplayer)</span>
+              </div>
+              <div className={`w-12 h-6 rounded-full p-1 transition-colors ${settings.enableSend ? 'bg-green-500' : 'bg-gray-700'}`}>
+                  <div className={`w-4 h-4 bg-white rounded-full shadow-md transform transition-transform ${settings.enableSend ? 'translate-x-6' : 'translate-x-0'}`}></div>
+              </div>
+           </button>
+        </div>
+
         {/* FPS / Performance Section */}
         <div className="space-y-4">
            <div>

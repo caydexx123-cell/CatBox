@@ -59,7 +59,9 @@ export const translations = {
     api_missing: 'Требуется API Key',
     api_desc: 'Для работы ИИ нужен ключ Google Gemini.',
     api_get: 'Получить ключ',
-    api_save: 'Сохранить Ключ'
+    api_save: 'Сохранить Ключ',
+    send_mode_title: 'Режим SEND',
+    send_mode_warn: 'Работает Сломанно! Советуется Отправлять Фото С одного Дома и одного АЙПИ!',
   },
   en: {
     app_title: 'Animation Studio',
@@ -118,7 +120,9 @@ export const translations = {
     api_missing: 'API Key Required',
     api_desc: 'Google Gemini Key needed for AI features.',
     api_get: 'Get Key',
-    api_save: 'Save Key'
+    api_save: 'Save Key',
+    send_mode_title: 'SEND Mode',
+    send_mode_warn: 'Works unstably! Advised to send photos from the same house and same IP!',
   },
   zh: {
     app_title: '动画工作室',
@@ -177,6 +181,8 @@ export const translations = {
     api_missing: '需要 API 密钥',
     api_desc: 'AI 功能需要 Google Gemini 密钥。',
     api_get: '获取密钥',
-    api_save: '保存密钥'
+    api_save: '保存密钥',
+    send_mode_title: 'SEND 模式',
+    send_mode_warn: '运行不稳定！建议在同一住所和同一 IP 下发送照片！',
   }
 };

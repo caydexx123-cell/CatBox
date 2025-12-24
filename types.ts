@@ -46,6 +46,7 @@ export interface AppSettings {
     photo: boolean;
     video: boolean;
   };
+  enableSend: boolean; // NEW: Toggle for SEND mode
 }
 
 export const CANVAS_SIZE = 800;

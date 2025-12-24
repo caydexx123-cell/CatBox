@@ -11,7 +11,7 @@ interface CanvasEditorProps {
   onUpdateFrame: (data: string) => void;
   isInteracting: (active: boolean) => void;
   isPlaying?: boolean;
-  optimizeFps?: boolean; // New prop
+  optimizeFps?: boolean; // Kept for prop compatibility but logic disabled for stability
 }
 
 export interface CanvasEditorHandle {
@@ -75,8 +75,6 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(({
         onUpdateFrame(''); 
     },
     getSnapshot: async () => {
-        // Create a temporary canvas to composite the white background
-        // This fixes the "Black Screen" issue on mobile galleries
         const canvas = canvasRef.current;
         if (!canvas) return '';
         
@@ -93,7 +91,7 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(({
         // 2. Draw current canvas on top
         tCtx.drawImage(canvas, 0, 0);
 
-        return tempCanvas.toDataURL('image/jpeg', 0.9);
+        return tempCanvas.toDataURL('image/png'); // High quality PNG
     }
   }));
 
@@ -128,15 +126,9 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(({
     img.src = dataUrl;
   };
 
-  // --- OPTIMIZATION LOGIC ---
-  // If optimizeFps is true:
-  // 1. desynchronized: true (reduces latency)
-  // 2. willReadFrequently: false (removes overhead for reading, speeds up drawing, slows down floodfill)
-  
+  // STABLE CONTEXT SETTINGS
+  // Removed 'desynchronized' as it causes flickering on some Android/iOS devices
   const getContextOptions = (): CanvasRenderingContext2DSettings => {
-      if (optimizeFps) {
-          return { desynchronized: true, alpha: true };
-      }
       return { willReadFrequently: true, alpha: true };
   };
 
@@ -144,27 +136,28 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(({
     const canvas = canvasRef.current;
     if (!canvas) return;
     
-    // Use proper context settings based on FPS mode
     const ctx = canvas.getContext('2d', getContextOptions());
     if (!ctx) return;
 
+    // Reset settings to ensure clean lines
+    ctx.imageSmoothingEnabled = false; 
+
     if (!currentFrameData || currentFrameData.length === 0) {
         ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-        setHistory([]);
-        setHistoryIndex(-1);
+        if (!isPlaying) {
+             setHistory([]);
+             setHistoryIndex(-1);
+        }
         setIsLoadingImage(false);
         return;
     }
 
     const currentHistoryTip = historyIndex >= 0 ? history[historyIndex] : '';
     
+    // Only redraw if data changed from outside (e.g. timeline switch)
     if (currentFrameData !== currentHistoryTip) {
         ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
         
-        // Disable smoothing in optimized mode for sharper, faster pixel rendering
-        ctx.imageSmoothingEnabled = !optimizeFps; 
-        if (!optimizeFps) ctx.imageSmoothingQuality = 'high';
-
         if (currentFrameData && currentFrameData.length > 10) {
             if (!isPlaying) setIsLoadingImage(true);
             
@@ -182,6 +175,7 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(({
                 
                 if (!isPlaying) {
                     const newData = canvas.toDataURL();
+                    // Sync history only if we loaded a fresh frame from timeline
                     setHistory([newData]);
                     setHistoryIndex(0);
                 }
@@ -191,7 +185,7 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(({
             img.src = currentFrameData;
         }
     }
-  }, [currentFrameData, isPlaying, optimizeFps]); // Re-run if optimizeFps changes (parent key change handles context reset usually)
+  }, [currentFrameData, isPlaying]);
 
   const startDrawing = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -207,7 +201,6 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(({
     const { x, y } = getCoordinates(e, canvas);
 
     if (drawingState.tool === 'fill') {
-      // Warn user or handle slow fill if optimized
       floodFill(ctx, x, y, drawingState.color);
       saveToHistory();
       setIsDrawing(false); 
@@ -217,6 +210,7 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(({
     lastPos.current = { x, y };
 
     ctx.beginPath();
+    // Draw a single dot
     ctx.arc(x, y, drawingState.brushSize / 2, 0, Math.PI * 2);
     ctx.fillStyle = drawingState.tool === 'eraser' ? '#ffffff' : drawingState.color;
     
@@ -234,12 +228,10 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    // In optimized mode, we don't need 'willReadFrequently'
-    const ctx = canvas.getContext('2d'); 
+    const ctx = canvas.getContext('2d', getContextOptions()); 
     if (!ctx) return;
 
-    // Coalesced events help get smoother lines on high refresh rate screens
-    // but can add CPU load. We iterate them if needed.
+    // Use coalesced events for smoother curves if available
     const events = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
 
     for (const event of events) {
@@ -254,7 +246,7 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(({
 
         if (drawingState.tool === 'eraser') {
           ctx.globalCompositeOperation = 'destination-out';
-          ctx.strokeStyle = 'rgba(0,0,0,1)'; 
+          ctx.strokeStyle = 'rgba(255,255,255,1)'; 
         } else {
           ctx.strokeStyle = drawingState.color;
         }
@@ -274,9 +266,9 @@ const CanvasEditor = forwardRef<CanvasEditorHandle, CanvasEditorProps>(({
   };
 
   return (
-    // Updated container to use w-full h-full and object-contain to prevent overflow on mobile
     <div ref={containerRef} className="relative w-full h-full flex items-center justify-center p-2 md:p-4">
-      <div className="relative aspect-square w-full max-w-[500px] max-h-full shadow-2xl rounded-3xl overflow-hidden bg-white border-4 border-catbox-panel/50 flex-shrink-0">
+      {/* Container maintains aspect ratio but respects parent bounds */}
+      <div className="relative aspect-square w-full h-full max-w-[80vh] max-h-[80vh] shadow-2xl rounded-3xl overflow-hidden bg-white border-4 border-catbox-panel/50 flex-shrink-0">
         <div 
             className="absolute inset-0 z-0 pointer-events-none opacity-20"
             style={{
