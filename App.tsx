@@ -22,15 +22,18 @@ const App: React.FC = () => {
 
   // Settings Persistence
   const [appSettings, setAppSettings] = useState<AppSettings>(() => {
-    const saved = localStorage.getItem('catbox_settings');
-    let settings = { language: 'ru', textStyle: 'default', aiModels: { photo: false, video: false } } as AppSettings;
-    
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      settings = { ...settings, ...parsed };
+    try {
+      const saved = localStorage.getItem('catbox_settings');
+      let settings = { language: 'ru', textStyle: 'default', aiModels: { photo: false, video: false } } as AppSettings;
+      
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        settings = { ...settings, ...parsed };
+      }
+      return settings;
+    } catch (e) {
+      return { language: 'ru', textStyle: 'default', aiModels: { photo: false, video: false } };
     }
-    
-    return settings;
   });
 
   useEffect(() => {
@@ -39,8 +42,10 @@ const App: React.FC = () => {
 
   // Gallery Persistence
   const [gallery, setGallery] = useState<GalleryItem[]>(() => {
-    const saved = localStorage.getItem('catbox_gallery');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('catbox_gallery');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
   });
 
   useEffect(() => {
@@ -49,8 +54,10 @@ const App: React.FC = () => {
 
   // Frames Persistence
   const [frames, setFrames] = useState<string[]>(() => {
-    const saved = localStorage.getItem('catbox_frames');
-    return saved ? JSON.parse(saved) : [''];
+    try {
+      const saved = localStorage.getItem('catbox_frames');
+      return saved ? JSON.parse(saved) : [''];
+    } catch { return ['']; }
   });
 
   useEffect(() => {
@@ -208,13 +215,24 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className={`h-screen w-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-[#0f172a] to-black text-white overflow-hidden selection:bg-none select-none flex justify-center ${getFontClass()}`}>
+    <div className={`fixed inset-0 w-full h-full bg-[#0f172a] text-white overflow-hidden selection:bg-none select-none flex justify-center items-center ${getFontClass()}`}>
       
-      <div className="relative w-full h-full max-w-6xl flex flex-col shadow-[0_0_100px_rgba(0,0,0,0.5)] md:border-x-2 md:border-white/10 bg-catbox-dark/50 backdrop-blur-sm">
+      {/* Background Grid Pattern for Web Support */}
+      <div 
+        className="absolute inset-0 z-0 pointer-events-none opacity-20"
+        style={{ 
+            backgroundImage: 'radial-gradient(#4b5563 1px, transparent 1px)', 
+            backgroundSize: '32px 32px' 
+        }}
+      ></div>
+      <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/20 z-0 pointer-events-none"></div>
+
+      {/* Main App Container */}
+      <div className="relative w-full h-full max-w-6xl flex flex-col shadow-[0_0_100px_rgba(0,0,0,0.5)] md:border-x-2 md:border-white/10 bg-catbox-dark/80 backdrop-blur-md z-10 transition-all">
         
         {/* --- MAIN NAVIGATION HEADER --- */}
         {mode !== 'home' && (
-           <div className={`flex items-center justify-between p-4 px-6 z-40 bg-gradient-to-b from-catbox-dark/90 to-transparent transition-all duration-300 ${isUIHidden ? '-translate-y-full' : ''} flex-shrink-0`}>
+           <div className={`flex items-center justify-between p-4 px-6 z-40 bg-gradient-to-b from-catbox-dark/95 to-transparent transition-all duration-300 ${isUIHidden ? '-translate-y-full' : ''} flex-shrink-0`}>
              <div className="flex items-center gap-4">
                 <button 
                 onClick={() => {
@@ -227,10 +245,8 @@ const App: React.FC = () => {
                 <Icons.Home size={24} />
                 </button>
 
-                {mode === 'animation' && <span className="text-xs font-black uppercase tracking-widest text-catbox-accent border border-catbox-accent/30 px-2 py-1 rounded">{t.animation}</span>}
-                {mode === 'photo' && <span className="text-xs font-black uppercase tracking-widest text-catbox-secondary border border-catbox-secondary/30 px-2 py-1 rounded">{t.photo}</span>}
-                {mode === 'send' && <span className="text-xs font-black uppercase tracking-widest text-green-500 border border-green-500/30 px-2 py-1 rounded">{t.send_title}</span>}
-                {mode === 'ai-chat' && <span className="text-xs font-black uppercase tracking-widest text-blue-500 border border-blue-500/30 px-2 py-1 rounded">{t.ai_chat}</span>}
+                {mode === 'animation' && <span className="text-xs font-black uppercase tracking-widest text-catbox-accent border border-catbox-accent/30 px-2 py-1 rounded hidden md:inline-block">{t.animation}</span>}
+                {mode === 'photo' && <span className="text-xs font-black uppercase tracking-widest text-catbox-secondary border border-catbox-secondary/30 px-2 py-1 rounded hidden md:inline-block">{t.photo}</span>}
              </div>
 
              <div className="flex items-center gap-3">
@@ -283,7 +299,7 @@ const App: React.FC = () => {
 
         {/* 1. HOME HUB */}
         {mode === 'home' && (
-          <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-8 animate-fade-in relative z-20 overflow-y-auto">
+          <div className="flex-1 w-full flex flex-col items-center justify-center p-8 space-y-8 animate-fade-in relative z-20 overflow-y-auto custom-scrollbar">
              
              <button 
                 onClick={() => setMode('settings')} 
@@ -360,7 +376,7 @@ const App: React.FC = () => {
         {/* 2. ANIMATION MODE */}
         {mode === 'animation' && (
           <>
-            <div className="flex-1 min-h-0 relative flex items-center justify-center p-4">
+            <div className="flex-1 w-full min-h-0 relative flex items-center justify-center p-4">
                <CanvasEditor 
                  ref={canvasRef}
                  key={currentFrameIndex}
@@ -400,7 +416,7 @@ const App: React.FC = () => {
         {/* 3. PHOTO MODE */}
         {mode === 'photo' && (
            <>
-             <div className="flex-1 min-h-0 relative flex items-center justify-center p-4">
+             <div className="flex-1 w-full min-h-0 relative flex items-center justify-center p-4">
                <CanvasEditor 
                  ref={canvasRef}
                  key="photo-canvas"
