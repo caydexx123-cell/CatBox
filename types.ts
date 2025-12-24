@@ -40,7 +40,8 @@ export interface User {
 export interface AppSettings {
   language: Language;
   textStyle: TextStyle;
-  optimizeFps: boolean; // NEW: FPS Boost setting
+  optimizeFps: boolean;
+  apiKey: string; // NEW: User's API Key
   aiModels: {
     photo: boolean;
     video: boolean;

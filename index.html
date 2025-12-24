@@ -14,13 +14,11 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Mochiy+Pop+One&family=Press+Start+2P&display=swap" rel="stylesheet">
 
-    <!-- Polyfill for process.env with YOUR API KEY -->
+    <!-- Polyfill for process (Env is now handled via App Settings, not injected here) -->
     <script>
       window.process = {
         env: {
-          NODE_ENV: 'production',
-          // INJECTED USER KEY - FOR EVERYONE TO USE
-          API_KEY: 'AIzaSyAjB5bfakLChtsPwYdxfwTTiSZeIBPGrzE' 
+          NODE_ENV: 'production'
         }
       };
     </script>

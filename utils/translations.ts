@@ -53,7 +53,13 @@ export const translations = {
     style_anime: 'Anime',
     opt_title: 'Производительность',
     opt_fps: 'FPS Boost (Меньше лагов)',
-    opt_desc: 'Включите, если рисование тормозит. (Заливка может стать медленнее)'
+    opt_desc: 'Включите, если рисование тормозит. (Заливка может стать медленнее)',
+    api_title: 'API KEY (Gemini)',
+    api_placeholder: 'Вставьте ключ сюда...',
+    api_missing: 'Требуется API Key',
+    api_desc: 'Для работы ИИ нужен ключ Google Gemini.',
+    api_get: 'Получить ключ',
+    api_save: 'Сохранить Ключ'
   },
   en: {
     app_title: 'Animation Studio',
@@ -106,7 +112,13 @@ export const translations = {
     style_anime: 'Anime',
     opt_title: 'Performance',
     opt_fps: 'FPS Boost (Reduce Lag)',
-    opt_desc: 'Enable if drawing feels slow. (Fill tool might be slower)'
+    opt_desc: 'Enable if drawing feels slow. (Fill tool might be slower)',
+    api_title: 'API KEY (Gemini)',
+    api_placeholder: 'Paste key here...',
+    api_missing: 'API Key Required',
+    api_desc: 'Google Gemini Key needed for AI features.',
+    api_get: 'Get Key',
+    api_save: 'Save Key'
   },
   zh: {
     app_title: '动画工作室',
@@ -159,6 +171,12 @@ export const translations = {
     style_anime: '动漫',
     opt_title: '性能',
     opt_fps: 'FPS 提升 (减少延迟)',
-    opt_desc: '如果绘图感觉缓慢，请启用。（填充工具可能会变慢）'
+    opt_desc: '如果绘图感觉缓慢，请启用。（填充工具可能会变慢）',
+    api_title: 'API KEY (Gemini)',
+    api_placeholder: '在此粘贴密钥...',
+    api_missing: '需要 API 密钥',
+    api_desc: 'AI 功能需要 Google Gemini 密钥。',
+    api_get: '获取密钥',
+    api_save: '保存密钥'
   }
 };

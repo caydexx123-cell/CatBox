@@ -9,7 +9,8 @@ interface AIAssistantProps {
   onVideoGenerated: (videoUrl: string) => void;
   onClose: () => void;
   settings: AppSettings;
-  variant?: 'home' | 'editor'; // New prop to distinguish visual style
+  variant?: 'home' | 'editor'; 
+  onUpdateSettings?: (newSettings: AppSettings) => void;
 }
 
 interface Message {
@@ -19,13 +20,14 @@ interface Message {
   content: string;
 }
 
-const AIAssistant: React.FC<AIAssistantProps> = ({ onImageGenerated, onVideoGenerated, onClose, settings, variant = 'home' }) => {
+const AIAssistant: React.FC<AIAssistantProps> = ({ onImageGenerated, onVideoGenerated, onClose, settings, variant = 'home', onUpdateSettings }) => {
   const t = translations[settings.language];
   const [messages, setMessages] = useState<Message[]>([
     { id: 'welcome', role: 'ai', type: 'text', content: t.chat_welcome }
   ]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [tempKey, setTempKey] = useState('');
   
   // Determine active mode based on settings
   const [activeMode, setActiveMode] = useState<'photo' | 'video'>(
@@ -40,6 +42,59 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onImageGenerated, onVideoGene
     }
   }, [messages]);
 
+  // If no API Key, show the lock screen
+  if (!settings.apiKey) {
+      return (
+        <div className={`absolute inset-0 z-50 bg-catbox-dark flex flex-col items-center justify-center p-6 animate-fade-in ${variant === 'editor' ? 'bg-black/95 backdrop-blur-xl' : ''}`}>
+             <button onClick={onClose} className="absolute top-4 right-4 p-3 bg-white/10 rounded-full hover:bg-white/20 transition-colors">
+                <Icons.X size={24} />
+             </button>
+
+             <div className="w-full max-w-md bg-catbox-panel border border-white/10 p-8 rounded-3xl text-center space-y-6 shadow-2xl">
+                 <div className="w-20 h-20 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-full flex items-center justify-center mx-auto text-blue-400 border border-white/10">
+                     <Icons.Sparkles size={40} className="animate-pulse" />
+                 </div>
+                 
+                 <div>
+                    <h2 className="text-2xl font-black text-white">{t.api_missing}</h2>
+                    <p className="text-gray-400 mt-2 text-sm">{t.api_desc}</p>
+                 </div>
+
+                 <input 
+                    type="text" 
+                    value={tempKey}
+                    onChange={(e) => setTempKey(e.target.value)}
+                    placeholder={t.api_placeholder}
+                    className="w-full bg-black/30 border border-white/20 rounded-xl p-4 text-center text-white text-sm font-mono focus:border-blue-500 focus:outline-none"
+                 />
+
+                 <button 
+                    onClick={() => {
+                        if (onUpdateSettings && tempKey.trim()) {
+                            onUpdateSettings({ ...settings, apiKey: tempKey.trim() });
+                        }
+                    }}
+                    disabled={!tempKey.trim()}
+                    className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl transition-all active:scale-95 shadow-[0_0_20px_rgba(37,99,235,0.4)]"
+                 >
+                    {t.api_save}
+                 </button>
+
+                 <div className="pt-4 border-t border-white/10">
+                     <a 
+                        href="https://aistudio.google.com/app/api-keys" 
+                        target="_blank" 
+                        rel="noreferrer"
+                        className="text-blue-400 text-xs font-bold uppercase hover:text-white transition-colors flex items-center justify-center gap-2"
+                     >
+                        {t.api_get} <Icons.ArrowRight size={12} />
+                     </a>
+                 </div>
+             </div>
+        </div>
+      );
+  }
+
   const handleSend = async () => {
     if (!inputValue.trim()) return;
 
@@ -49,7 +104,8 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onImageGenerated, onVideoGene
     setIsLoading(true);
 
     try {
-       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+       // USE THE USER KEY FROM SETTINGS
+       const ai = new GoogleGenAI({ apiKey: settings.apiKey });
        
        // Both modes use Gemini 2.5 Flash Image.
        const finalPrompt = activeMode === 'video' 
@@ -79,7 +135,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onImageGenerated, onVideoGene
        if (!found) throw new Error("No image generated");
 
     } catch (e: any) {
-        setMessages(prev => [...prev, { id: Date.now().toString(), role: 'ai', type: 'text', content: 'Error: ' + e.message }]);
+        setMessages(prev => [...prev, { id: Date.now().toString(), role: 'ai', type: 'text', content: 'Error: ' + (e.message || "Invalid Key?") }]);
     } finally {
         setIsLoading(false);
     }

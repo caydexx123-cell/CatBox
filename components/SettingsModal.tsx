@@ -48,6 +48,33 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ settings, onUpdateSetting
           </button>
         </div>
 
+        {/* API KEY Section - IMPORTANT */}
+        <div className="space-y-2 bg-white/5 p-4 rounded-2xl border border-white/10">
+           <label className="text-xs text-blue-400 font-bold uppercase tracking-widest flex items-center gap-2">
+             <Icons.Sparkles size={12} /> {t.api_title}
+           </label>
+           <p className="text-[10px] text-gray-500">{t.api_desc}</p>
+           
+           <div className="flex gap-2">
+             <input 
+               type="text" 
+               value={settings.apiKey}
+               onChange={(e) => onUpdateSettings({ ...settings, apiKey: e.target.value })}
+               placeholder={t.api_placeholder}
+               className="w-full bg-black/30 border border-white/20 rounded-xl p-3 text-white text-xs font-mono focus:border-blue-500 focus:outline-none"
+             />
+           </div>
+           
+           <a 
+             href="https://aistudio.google.com/app/api-keys" 
+             target="_blank" 
+             rel="noreferrer"
+             className="inline-flex items-center gap-1 text-[10px] text-blue-400 hover:text-blue-300 font-bold uppercase mt-1"
+           >
+             {t.api_get} <Icons.ArrowRight size={10} />
+           </a>
+        </div>
+
         {/* FPS / Performance Section */}
         <div className="space-y-4">
            <div>

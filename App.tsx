@@ -24,7 +24,7 @@ const App: React.FC = () => {
   const [appSettings, setAppSettings] = useState<AppSettings>(() => {
     try {
       const saved = localStorage.getItem('catbox_settings');
-      let settings = { language: 'ru', textStyle: 'default', optimizeFps: false, aiModels: { photo: false, video: false } } as AppSettings;
+      let settings = { language: 'ru', textStyle: 'default', optimizeFps: false, apiKey: '', aiModels: { photo: false, video: false } } as AppSettings;
       
       if (saved) {
         const parsed = JSON.parse(saved);
@@ -32,7 +32,7 @@ const App: React.FC = () => {
       }
       return settings;
     } catch (e) {
-      return { language: 'ru', textStyle: 'default', optimizeFps: false, aiModels: { photo: false, video: false } };
+      return { language: 'ru', textStyle: 'default', optimizeFps: false, apiKey: '', aiModels: { photo: false, video: false } };
     }
   });
 
@@ -487,6 +487,7 @@ const App: React.FC = () => {
               onImageGenerated={(url) => handleAIImageGenerated(url)}
               onVideoGenerated={(url) => saveToGallery(url, 'video-gen')}
               variant="home"
+              onUpdateSettings={setAppSettings}
            />
         )}
 
@@ -497,6 +498,7 @@ const App: React.FC = () => {
               onImageGenerated={(url) => handleAIImageGenerated(url)}
               onVideoGenerated={(url) => saveToGallery(url, 'video-gen')}
               variant="editor"
+              onUpdateSettings={setAppSettings}
            />
         )}
 
