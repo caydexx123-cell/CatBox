@@ -7,6 +7,8 @@ export type Language = 'ru' | 'en' | 'zh';
 
 export type TextStyle = 'default' | 'minecraft' | 'anime';
 
+export type AppTheme = 'default' | 'newyear' | 'halloween' | 'easter'; // NEW: Easter Theme
+
 export interface Point {
   x: number;
   y: number;
@@ -40,13 +42,14 @@ export interface User {
 export interface AppSettings {
   language: Language;
   textStyle: TextStyle;
+  theme: AppTheme; // Active Theme
   optimizeFps: boolean;
-  apiKey: string; // NEW: User's API Key
+  apiKey: string; 
   aiModels: {
     photo: boolean;
     video: boolean;
   };
-  enableSend: boolean; // NEW: Toggle for SEND mode
+  enableSend: boolean; 
 }
 
 export const CANVAS_SIZE = 800;

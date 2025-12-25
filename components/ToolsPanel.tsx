@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Icons } from './Icon';
 import { DrawingState, ToolType, Language } from '../types';
@@ -146,13 +147,13 @@ const ToolsPanel: React.FC<ToolsPanelProps> = ({
                 <Icons.Redo size={16} />
             </button>
 
-            {/* Photo Mode: Save (Check) */}
+            {/* Photo Mode: Save (Folder Icon) */}
             {isPhotoMode && onSave && (
                 <button 
                     onClick={() => onSave()}
-                    className="w-10 h-full rounded-lg bg-green-500 border border-green-400 flex items-center justify-center text-white shadow-lg active:scale-95"
+                    className="w-10 h-full rounded-lg bg-yellow-500 hover:bg-yellow-400 border border-yellow-400 flex items-center justify-center text-black shadow-lg active:scale-95"
                 >
-                    <Icons.Check size={18} />
+                    <Icons.FolderDown size={18} />
                 </button>
             )}
         </div>

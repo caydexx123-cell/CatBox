@@ -27,7 +27,11 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onImageGenerated, onVideoGene
   ]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  
+  // API Key Validation State
   const [tempKey, setTempKey] = useState('');
+  const [isValidatingKey, setIsValidatingKey] = useState(false);
+  const [keyError, setKeyError] = useState<string | null>(null);
   
   // Determine active mode based on settings
   const [activeMode, setActiveMode] = useState<'photo' | 'video'>(
@@ -42,6 +46,47 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onImageGenerated, onVideoGene
     }
   }, [messages]);
 
+  const validateAndSaveKey = async () => {
+      const cleanKey = tempKey.trim();
+      if (!cleanKey) return;
+      
+      // Basic Format Check
+      if (!cleanKey.startsWith('AIza')) {
+          setKeyError(t.api_format_err);
+          return;
+      }
+
+      setIsValidatingKey(true);
+      setKeyError(null);
+
+      try {
+          // REAL VALIDATION: Check against a STABLE TEXT model
+          const ai = new GoogleGenAI({ apiKey: cleanKey });
+          
+          // Using gemini-2.0-flash for validation (lightweight)
+          await ai.models.generateContent({
+              model: 'gemini-2.0-flash', 
+              contents: 'Ping',
+          });
+
+          // If no error thrown, we are good!
+          if (onUpdateSettings) {
+              onUpdateSettings({ ...settings, apiKey: cleanKey });
+          }
+      } catch (e: any) {
+          console.error("Key Validation Failed", e);
+          let errorMsg = t.api_fail;
+          if (e.message?.includes('404') || e.message?.includes('NOT_FOUND')) {
+             errorMsg = "Ошибка 404: Модель не найдена (проверьте права ключа)";
+          } else if (e.message?.includes('403') || e.message?.includes('PERMISSION_DENIED')) {
+             errorMsg = "Ошибка 403: Неверный ключ или нет доступа";
+          }
+          setKeyError(errorMsg);
+      } finally {
+          setIsValidatingKey(false);
+      }
+  };
+
   // If no API Key, show the lock screen
   if (!settings.apiKey) {
       return (
@@ -51,8 +96,8 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onImageGenerated, onVideoGene
              </button>
 
              <div className="w-full max-w-md bg-catbox-panel border border-white/10 p-8 rounded-3xl text-center space-y-6 shadow-2xl">
-                 <div className="w-20 h-20 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-full flex items-center justify-center mx-auto text-blue-400 border border-white/10">
-                     <Icons.Sparkles size={40} className="animate-pulse" />
+                 <div className={`w-20 h-20 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-full flex items-center justify-center mx-auto border border-white/10 ${keyError ? 'border-red-500/50 bg-red-900/20 text-red-400' : 'text-blue-400'}`}>
+                     {keyError ? <Icons.X size={40} /> : <Icons.Sparkles size={40} className="animate-pulse" />}
                  </div>
                  
                  <div>
@@ -60,24 +105,34 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onImageGenerated, onVideoGene
                     <p className="text-gray-400 mt-2 text-sm">{t.api_desc}</p>
                  </div>
 
-                 <input 
-                    type="text" 
-                    value={tempKey}
-                    onChange={(e) => setTempKey(e.target.value)}
-                    placeholder={t.api_placeholder}
-                    className="w-full bg-black/30 border border-white/20 rounded-xl p-4 text-center text-white text-sm font-mono focus:border-blue-500 focus:outline-none"
-                 />
+                 <div className="space-y-2">
+                    <input 
+                        type="text" 
+                        value={tempKey}
+                        onChange={(e) => {
+                            setTempKey(e.target.value);
+                            setKeyError(null);
+                        }}
+                        placeholder={t.api_placeholder}
+                        className={`w-full bg-black/30 border rounded-xl p-4 text-center text-white text-sm font-mono focus:outline-none transition-colors ${keyError ? 'border-red-500 text-red-200' : 'border-white/20 focus:border-blue-500'}`}
+                    />
+                    {keyError && <p className="text-xs text-red-400 font-bold">{keyError}</p>}
+                 </div>
 
                  <button 
-                    onClick={() => {
-                        if (onUpdateSettings && tempKey.trim()) {
-                            onUpdateSettings({ ...settings, apiKey: tempKey.trim() });
-                        }
-                    }}
-                    disabled={!tempKey.trim()}
-                    className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl transition-all active:scale-95 shadow-[0_0_20px_rgba(37,99,235,0.4)]"
+                    onClick={validateAndSaveKey}
+                    disabled={!tempKey.trim() || isValidatingKey}
+                    className={`w-full font-bold py-4 rounded-xl transition-all active:scale-95 shadow-lg flex items-center justify-center gap-2 ${
+                        isValidatingKey 
+                        ? 'bg-gray-600 text-gray-300 cursor-wait' 
+                        : (keyError ? 'bg-red-600 hover:bg-red-500 text-white' : 'bg-blue-600 hover:bg-blue-500 text-white shadow-[0_0_20px_rgba(37,99,235,0.4)]')
+                    }`}
                  >
-                    {t.api_save}
+                    {isValidatingKey ? (
+                        <><div className="loader w-4 h-4 border-2"></div> {t.api_validating}</>
+                    ) : (
+                        t.api_save
+                    )}
                  </button>
 
                  <div className="pt-4 border-t border-white/10">
@@ -98,20 +153,26 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onImageGenerated, onVideoGene
   const handleSend = async () => {
     if (!inputValue.trim()) return;
 
-    const userMsg: Message = { id: Date.now().toString(), role: 'user', type: 'text', content: inputValue };
+    const userMsg: Message = { id: Date.now().toString() + 'u', role: 'user', type: 'text', content: inputValue };
     setMessages(prev => [...prev, userMsg]);
     setInputValue('');
     setIsLoading(true);
 
     try {
-       // USE THE USER KEY FROM SETTINGS
        const ai = new GoogleGenAI({ apiKey: settings.apiKey });
        
-       // Both modes use Gemini 2.5 Flash Image.
-       const finalPrompt = activeMode === 'video' 
-          ? `${inputValue}, cinematic shot, wide 16:9 aspect ratio, high quality` 
-          : `${inputValue}, square 1:1 aspect ratio`;
+       // Construct a SAFE prompt.
+       // Avoid "square 1:1" and "photo" keywords which trigger safety filters falsely.
+       let finalPrompt = inputValue;
+       
+       if (activeMode === 'video') {
+           finalPrompt += ", cinematic, wide view";
+       } else {
+           finalPrompt += ", digital art"; 
+       }
 
+       // Use the correct IMAGE model: gemini-2.5-flash-image
+       // It automatically returns 1:1 unless specified otherwise in config (but config is limited for this model)
        const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash-image',
         contents: { parts: [{ text: finalPrompt }] },
@@ -122,20 +183,34 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onImageGenerated, onVideoGene
             for (const part of response.candidates[0].content.parts) {
             if (part.inlineData && part.inlineData.data) {
                 const url = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-                
-                setMessages(prev => [...prev, { id: Date.now().toString(), role: 'ai', type: 'image', content: url }]);
-                
-                // Save to gallery
+                setMessages(prev => [...prev, { id: Date.now().toString() + Math.random(), role: 'ai', type: 'image', content: url }]);
                 onImageGenerated(url);
                 found = true;
                 break;
             }
             }
        }
-       if (!found) throw new Error("No image generated");
+       
+       if (!found) {
+           // Check if it's a text refusal (Policy violation usually comes here)
+           const text = response.candidates?.[0]?.content?.parts?.[0]?.text;
+           if (text) {
+               // Translate safety error to friendly message if possible
+               if (text.includes("policy") || text.includes("violates")) {
+                   setMessages(prev => [...prev, { id: Date.now().toString() + 'e', role: 'ai', type: 'text', content: "⚠️ ИИ отказался рисовать это из-за политики безопасности. Попробуйте перефразировать запрос (избегайте реализма людей)." }]);
+               } else {
+                   setMessages(prev => [...prev, { id: Date.now().toString() + 't', role: 'ai', type: 'text', content: text }]);
+               }
+           } else {
+               throw new Error("No content generated");
+           }
+       }
 
     } catch (e: any) {
-        setMessages(prev => [...prev, { id: Date.now().toString(), role: 'ai', type: 'text', content: 'Error: ' + (e.message || "Invalid Key?") }]);
+        console.error(e);
+        let errorMsg = 'Error: ' + (e.message || "Unknown error");
+        if (errorMsg.includes("404")) errorMsg = "Модель недоступна (404). Проверьте ключ.";
+        setMessages(prev => [...prev, { id: Date.now().toString() + 'err', role: 'ai', type: 'text', content: errorMsg }]);
     } finally {
         setIsLoading(false);
     }

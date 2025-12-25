@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import CanvasEditor, { CanvasEditorHandle } from './components/CanvasEditor';
 import Timeline from './components/Timeline';
@@ -8,7 +9,7 @@ import SendHub from './components/SendHub';
 import ColorPicker from './components/ColorPicker';
 import SettingsModal from './components/SettingsModal';
 import { Icons } from './components/Icon';
-import { DrawingState, AnimationSettings, AppMode, GalleryItem, AppSettings } from './types';
+import { DrawingState, AnimationSettings, AppMode, GalleryItem, AppSettings, AppTheme } from './types';
 import { exportToVideo } from './utils/exportUtils';
 import { translations } from './utils/translations';
 
@@ -31,7 +32,7 @@ const App: React.FC = () => {
   const [appSettings, setAppSettings] = useState<AppSettings>(() => {
     try {
       const saved = localStorage.getItem('catbox_settings');
-      let settings = { language: 'ru', textStyle: 'default', optimizeFps: false, apiKey: '', aiModels: { photo: false, video: false }, enableSend: false } as AppSettings;
+      let settings = { language: 'ru', textStyle: 'default', theme: 'default', optimizeFps: false, apiKey: '', aiModels: { photo: false, video: false }, enableSend: false } as AppSettings;
       
       if (saved) {
         const parsed = JSON.parse(saved);
@@ -39,12 +40,16 @@ const App: React.FC = () => {
       }
       return settings;
     } catch (e) {
-      return { language: 'ru', textStyle: 'default', optimizeFps: false, apiKey: '', aiModels: { photo: false, video: false }, enableSend: false };
+      return { language: 'ru', textStyle: 'default', theme: 'default', optimizeFps: false, apiKey: '', aiModels: { photo: false, video: false }, enableSend: false };
     }
   });
 
   useEffect(() => {
-    localStorage.setItem('catbox_settings', JSON.stringify(appSettings));
+    try {
+      localStorage.setItem('catbox_settings', JSON.stringify(appSettings));
+    } catch (e) {
+      console.warn("Storage full (Settings)");
+    }
   }, [appSettings]);
 
   // Gallery Persistence
@@ -56,7 +61,13 @@ const App: React.FC = () => {
   });
 
   useEffect(() => {
-    localStorage.setItem('catbox_gallery', JSON.stringify(gallery));
+    try {
+      // Limit to last 50 items to prevent QuotaExceededError crash
+      const safeGallery = gallery.slice(0, 50);
+      localStorage.setItem('catbox_gallery', JSON.stringify(safeGallery));
+    } catch (e) {
+      console.warn("Storage full (Gallery) - App will continue but data might not persist");
+    }
   }, [gallery]);
 
   // Frames Persistence
@@ -68,7 +79,11 @@ const App: React.FC = () => {
   });
 
   useEffect(() => {
-    localStorage.setItem('catbox_frames', JSON.stringify(frames));
+    try {
+      localStorage.setItem('catbox_frames', JSON.stringify(frames));
+    } catch (e) {
+      console.warn("Storage full (Frames)");
+    }
   }, [frames]);
 
   const [currentFrameIndex, setCurrentFrameIndex] = useState(0);
@@ -166,13 +181,17 @@ const App: React.FC = () => {
 
   const saveToGallery = (dataUrl: string, type: 'image' | 'ai-gen' | 'video-gen') => {
     if (!dataUrl) return;
-    const newItem: GalleryItem = {
-      id: Date.now().toString(),
-      type,
-      dataUrl,
-      timestamp: Date.now()
-    };
-    setGallery(prev => [newItem, ...prev]);
+    try {
+        const newItem: GalleryItem = {
+          id: Date.now().toString() + Math.random().toString().slice(2, 5), // Safer ID
+          type,
+          dataUrl,
+          timestamp: Date.now()
+        };
+        setGallery(prev => [newItem, ...prev]);
+    } catch (e) {
+        alert("Ошибка: Память устройства переполнена. Удалите старые работы из галереи.");
+    }
   };
 
   const handleAIImageGenerated = (url: string) => {
@@ -220,25 +239,23 @@ const App: React.FC = () => {
 
       const videoUrl = await exportToVideo(frames, settings.fps);
       if (videoUrl) {
-           const a = document.createElement('a');
-           a.href = videoUrl;
-           a.download = `catbox_anim_${Date.now()}.mp4`; 
-           a.click();
+           // SAVE TO INTERNAL GALLERY ONLY
+           saveToGallery(videoUrl, 'video-gen');
+           const t = translations[appSettings.language];
+           alert(t.saved_msg); 
       } else {
            alert("Ошибка экспорта");
       }
       setIsExporting(false);
   };
 
+  // ONLY SAVES TO GALLERY (Internal Folder) - NO DOWNLOAD
   const handleQuickSavePhoto = async () => {
      if (canvasRef.current && canvasRef.current.getSnapshot) {
          const snapshotUrl = await canvasRef.current.getSnapshot();
-         const a = document.createElement('a');
-         a.href = snapshotUrl;
-         a.download = `catbox_art_${Date.now()}.png`; // Always PNG
-         a.click();
          saveToGallery(snapshotUrl, 'image');
-         // No alert needed, download starts automatically
+         const t = translations[appSettings.language];
+         alert(t.saved_msg); 
      }
   };
 
@@ -266,15 +283,26 @@ const App: React.FC = () => {
     paddingRight: 'env(safe-area-inset-right)',
   };
 
-  const bgStyle = isAngryMode 
-     ? "bg-red-950 transition-colors duration-100" 
-     : "bg-[#0f172a] transition-colors duration-500";
+  // THEME LOGIC
+  const currentTheme = appSettings.theme;
+
+  const getBgStyle = () => {
+      if (isAngryMode) return "bg-red-950 transition-colors duration-100";
+      if (currentTheme === 'newyear') return "bg-blue-950 transition-colors duration-500";
+      if (currentTheme === 'halloween') return "bg-purple-950 transition-colors duration-500";
+      // Midnight Easter (Dark Purple/Indigo)
+      if (currentTheme === 'easter') return "bg-gradient-to-br from-[#2e1065] via-[#4c1d95] to-[#db2777] transition-colors duration-500"; 
+      return "bg-[#0f172a] transition-colors duration-500";
+  };
   
-  const borderStyle = isAngryMode ? "border-red-500/50" : "border-white/10";
+  const borderStyle = isAngryMode ? "border-red-500/50" : (currentTheme === 'halloween' ? "border-green-500/30" : "border-white/10");
+  
+  // Easter is now Dark theme compatible (Dark Pastel)
+  const isLightTheme = false; 
 
   return (
     <div 
-      className={`fixed inset-0 w-full h-[100dvh] text-white overflow-hidden selection:bg-none select-none flex justify-center items-center ${getFontClass()} ${bgStyle} ${isAngryMode ? 'animate-[shake_0.5s_ease-in-out_infinite]' : ''}`}
+      className={`fixed inset-0 w-full h-[100dvh] overflow-hidden selection:bg-none select-none flex justify-center items-center ${getFontClass()} ${getBgStyle()} ${isLightTheme ? 'text-slate-800' : 'text-white'} ${isAngryMode ? 'animate-[shake_0.5s_ease-in-out_infinite]' : ''} bg-noise`}
     >
       <style>{`
         @keyframes shake {
@@ -283,6 +311,24 @@ const App: React.FC = () => {
           50% { transform: translate(2px, -2px); }
           75% { transform: translate(-2px, -2px); }
         }
+        @keyframes snowfall {
+          0% { transform: translateY(-10vh); opacity: 0; }
+          20% { opacity: 1; }
+          100% { transform: translateY(110vh); opacity: 0.2; }
+        }
+        .snow-particle {
+          position: absolute;
+          top: -20px;
+          background: white;
+          border-radius: 50%;
+          animation: snowfall linear infinite;
+        }
+        .egg-particle {
+           position: absolute;
+           top: -20px;
+           border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+           animation: snowfall linear infinite;
+        }
       `}</style>
 
       {/* Background Decor */}
@@ -290,17 +336,74 @@ const App: React.FC = () => {
         style={{ 
             backgroundImage: isAngryMode 
                 ? 'repeating-linear-gradient(45deg, #450a0a 0, #450a0a 10px, #7f1d1d 10px, #7f1d1d 20px)' 
-                : 'radial-gradient(#4b5563 1px, transparent 1px)', 
+                : (currentTheme === 'newyear' 
+                    ? 'none' 
+                    : (currentTheme === 'halloween' 
+                        ? 'radial-gradient(circle, #000 0%, #3b0764 100%)' 
+                        : (currentTheme === 'easter' ? 'radial-gradient(#f472b6 2px, transparent 2px)' : 'radial-gradient(#4b5563 1px, transparent 1px)'))), 
             backgroundSize: isAngryMode ? '100% 100%' : '32px 32px' 
         }}>
       </div>
       
+      {/* THEME SPECIFIC EFFECTS */}
+      {currentTheme === 'newyear' && !isAngryMode && (
+          <div className="absolute inset-0 z-0 pointer-events-none">
+               {[...Array(30)].map((_, i) => (
+                   <div 
+                     key={i} 
+                     className="snow-particle"
+                     style={{
+                         left: `${Math.random() * 100}%`,
+                         width: `${Math.random() * 4 + 2}px`,
+                         height: `${Math.random() * 4 + 2}px`,
+                         animationDuration: `${Math.random() * 5 + 5}s`,
+                         animationDelay: `${Math.random() * 5}s`,
+                         opacity: Math.random() * 0.7
+                     }}
+                   />
+               ))}
+          </div>
+      )}
+
+      {currentTheme === 'easter' && !isAngryMode && (
+          <div className="absolute inset-0 z-0 pointer-events-none">
+               {[...Array(15)].map((_, i) => {
+                   const colors = ['#f472b6', '#a78bfa', '#34d399', '#fbbf24', '#ffffff'];
+                   return (
+                    <div 
+                        key={i} 
+                        className="egg-particle"
+                        style={{
+                            left: `${Math.random() * 100}%`,
+                            width: `${Math.random() * 6 + 4}px`,
+                            height: `${Math.random() * 8 + 6}px`,
+                            backgroundColor: colors[Math.floor(Math.random() * colors.length)],
+                            animationDuration: `${Math.random() * 8 + 5}s`,
+                            animationDelay: `${Math.random() * 5}s`,
+                            opacity: Math.random() * 0.4
+                        }}
+                    />
+                   )
+               })}
+          </div>
+      )}
+
+      {currentTheme === 'halloween' && !isAngryMode && (
+          <div className="absolute inset-0 z-0 pointer-events-none bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCI+PGNpcmNsZSBjeD0iMiIgY3k9IjIiIHI9IjEiIGZpbGw9IiM0YWRlODAiIG9wYWNpdHk9IjAuMiIvPjwvc3ZnPg==')] opacity-30 animate-pulse"></div>
+      )}
+      
       {/* Fancy Glow */}
-      <div className={`absolute top-0 left-0 w-full h-full bg-gradient-to-br z-0 pointer-events-none ${isAngryMode ? 'from-red-900/50 to-black' : 'from-indigo-900/20 via-transparent to-black/40'}`}></div>
+      <div className={`absolute top-0 left-0 w-full h-full bg-gradient-to-br z-0 pointer-events-none ${
+          isAngryMode ? 'from-red-900/50 to-black' : 
+          (currentTheme === 'newyear' ? 'from-blue-500/10 to-transparent' : 
+          (currentTheme === 'halloween' ? 'from-purple-900/40 via-transparent to-green-900/20' : 
+          (currentTheme === 'easter' ? 'from-pink-500/10 via-transparent to-purple-500/20' : 'from-indigo-900/20 via-transparent to-black/40')))
+          }`}>
+      </div>
 
       {/* Main App Container */}
       <div 
-        className={`relative w-full h-full max-w-6xl flex flex-col shadow-2xl md:border-x-2 ${borderStyle} bg-catbox-dark/80 backdrop-blur-2xl z-10 transition-all`}
+        className={`relative w-full h-full max-w-6xl flex flex-col shadow-2xl md:border-x-2 ${borderStyle} ${isLightTheme ? 'bg-white/80' : 'bg-catbox-dark/90'} backdrop-blur-md z-10 transition-all`}
         style={safeAreaStyle}
       >
         
@@ -319,8 +422,8 @@ const App: React.FC = () => {
                 <Icons.Home size={24} />
                 </button>
 
-                {mode === 'animation' && <span className="text-[10px] md:text-xs font-black uppercase tracking-widest text-catbox-accent border border-catbox-accent/30 px-2 py-1 rounded hidden md:inline-block bg-catbox-accent/10">{t.animation}</span>}
-                {mode === 'photo' && <span className="text-[10px] md:text-xs font-black uppercase tracking-widest text-catbox-secondary border border-catbox-secondary/30 px-2 py-1 rounded hidden md:inline-block bg-catbox-secondary/10">{t.photo}</span>}
+                {mode === 'animation' && <span className="text-[10px] md:text-xs font-black uppercase tracking-widest text-catbox-accent border-2 border-catbox-accent/30 px-2 py-1 rounded hidden md:inline-block bg-catbox-accent/10">{t.animation}</span>}
+                {mode === 'photo' && <span className="text-[10px] md:text-xs font-black uppercase tracking-widest text-catbox-secondary border-2 border-catbox-secondary/30 px-2 py-1 rounded hidden md:inline-block bg-catbox-secondary/10">{t.photo}</span>}
              </div>
 
              <div className="flex items-center gap-2">
@@ -329,13 +432,13 @@ const App: React.FC = () => {
                       {showAiButton && (
                         <button 
                             onClick={() => setIsAiOverlayOpen(true)} 
-                            className="p-2 bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-blue-400/30 rounded-full hover:bg-blue-500/30 text-blue-300 shadow-[0_0_10px_rgba(59,130,246,0.2)] active:scale-95" 
+                            className="p-2 bg-gradient-to-br from-blue-500/20 to-purple-500/20 border-2 border-blue-400/30 rounded-full hover:bg-blue-500/30 text-blue-300 shadow-[0_0_10px_rgba(59,130,246,0.2)] active:scale-95" 
                         >
                             <Icons.Sparkles size={22} />
                         </button>
                       )}
 
-                      <button onClick={openGallery} className="p-2 bg-white/5 border border-white/20 rounded-full hover:bg-white/10 text-yellow-400 active:scale-95">
+                      <button onClick={openGallery} className="p-2 bg-white/5 border-2 border-white/20 rounded-full hover:bg-white/10 text-yellow-400 active:scale-95">
                           <Icons.Folder size={22} />
                       </button>
                     </>
@@ -343,7 +446,7 @@ const App: React.FC = () => {
 
                 {mode === 'animation' && (
                     <>
-                    <div className="relative z-50 flex items-center gap-2 bg-black/60 p-1 px-3 rounded-full backdrop-blur-md border border-white/20 shadow-inner">
+                    <div className="relative z-50 flex items-center gap-2 bg-black/60 p-1 px-3 rounded-full backdrop-blur-md border-2 border-white/20 shadow-inner">
                         <div className="flex flex-col items-center justify-center pr-1 w-14 md:w-20 pt-1">
                              <input 
                                 type="range" 
@@ -359,9 +462,9 @@ const App: React.FC = () => {
                             {settings.isPlaying ? <Icons.Pause size={14} fill="currentColor"/> : <Icons.Play size={14} fill="currentColor"/>}
                         </button>
                     </div>
-                    {/* EXPORT VIDEO BUTTON - DIRECT */}
-                    <button onClick={handleQuickExportVideo} className="p-2 bg-white/5 rounded-full hover:bg-white/10 text-catbox-accent border border-white/10 active:scale-95">
-                        <Icons.Download size={22} />
+                    {/* EXPORT VIDEO BUTTON - FOLDER ICON, NO DOWNLOAD */}
+                    <button onClick={handleQuickExportVideo} className="p-2 bg-yellow-500 hover:bg-yellow-400 rounded-full text-black border-2 border-yellow-400 active:scale-95 shadow-lg">
+                        <Icons.FolderDown size={22} />
                     </button>
                     </>
                 )}
@@ -377,7 +480,7 @@ const App: React.FC = () => {
              
              <button 
                 onClick={() => setMode('settings')} 
-                className="absolute top-4 right-4 md:top-6 md:right-6 p-3 bg-white/5 rounded-full hover:bg-white/10 border border-white/10 hover:border-white/30 transition-all text-gray-400 hover:text-white backdrop-blur-md"
+                className={`absolute top-4 right-4 md:top-6 md:right-6 p-3 rounded-full border-2 transition-all backdrop-blur-md ${isLightTheme ? 'bg-white/40 border-black/10 hover:bg-white/60 text-black' : 'bg-white/5 border-white/10 hover:bg-white/10 text-gray-400 hover:text-white'}`}
              >
                 <Icons.Settings size={24} />
              </button>
@@ -385,23 +488,23 @@ const App: React.FC = () => {
              <div className="text-center space-y-2 mt-4">
                 <div className="relative inline-block group cursor-pointer" onClick={handleCatClick}>
                     <div className={`absolute inset-0 blur-3xl rounded-full transition-opacity duration-300 ${isAngryMode ? 'bg-red-600 opacity-60 animate-pulse' : 'bg-catbox-accent opacity-30 group-hover:opacity-50'}`}></div>
-                    <div className={`relative w-32 h-32 backdrop-blur-xl rounded-full border-2 flex items-center justify-center shadow-2xl mx-auto mb-6 transition-transform duration-100 ${isAngryMode ? 'border-red-500 bg-black/50 scale-125' : 'border-white/20 bg-white/10 group-hover:scale-110'}`}>
-                        {/* CAT ICON - Passes angry state */}
-                        <Icons.Cat size={80} className={`drop-shadow-2xl transition-all ${isAngryMode ? 'text-red-500' : 'text-white'}`} isAngry={isAngryMode} />
+                    <div className={`relative w-32 h-32 backdrop-blur-xl rounded-full border-4 flex items-center justify-center shadow-2xl mx-auto mb-6 transition-transform duration-100 ${isAngryMode ? 'border-red-500 bg-black/50 scale-125' : 'border-white/20 bg-white/10 group-hover:scale-110'}`}>
+                        {/* CAT ICON - Passes angry state AND Theme */}
+                        <Icons.Cat size={80} className={`drop-shadow-2xl transition-all ${isAngryMode ? 'text-red-500' : (isLightTheme ? 'text-slate-800' : 'text-white')}`} isAngry={isAngryMode} theme={currentTheme} />
                     </div>
                 </div>
-                <h1 className={`text-5xl md:text-6xl font-black bg-clip-text text-transparent tracking-tighter ${isAngryMode ? 'bg-red-500' : 'bg-gradient-to-r from-catbox-accent via-white to-catbox-secondary'}`}>
-                    {isAngryMode ? "ANGRY CAT!" : "CatBox"}
+                <h1 className={`text-5xl md:text-6xl font-black bg-clip-text text-transparent tracking-tighter ${isAngryMode ? 'bg-red-500' : (currentTheme === 'newyear' ? 'bg-gradient-to-r from-blue-300 via-white to-blue-300' : (currentTheme === 'halloween' ? 'bg-gradient-to-r from-orange-400 via-purple-400 to-green-400' : (currentTheme === 'easter' ? 'bg-gradient-to-r from-pink-400 via-purple-400 to-teal-400' : 'bg-gradient-to-r from-catbox-accent via-white to-catbox-secondary')))}`}>
+                    {isAngryMode ? "ANGRY CAT!" : (currentTheme === 'easter' ? "BunnyBox" : "CatBox")}
                 </h1>
-                <p className="text-gray-400 tracking-[0.3em] uppercase text-[10px] font-bold border-t border-b border-white/10 py-2 inline-block px-4">{t.app_title}</p>
+                <p className={`${isLightTheme ? 'text-slate-500 border-slate-300' : 'text-gray-400 border-white/10'} tracking-[0.3em] uppercase text-[10px] font-bold border-t border-b py-2 inline-block px-4`}>{t.app_title}</p>
              </div>
 
              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 w-full max-w-xl pb-20">
                 <button 
                   onClick={() => setMode('animation')}
-                  className={`aspect-[4/3] bg-catbox-panel/60 border-2 rounded-3xl flex flex-col items-center justify-center gap-3 hover:scale-[1.02] transition-all group backdrop-blur-xl shadow-xl active:scale-95 ${isAngryMode ? 'border-red-500/30' : 'border-white/10 hover:border-catbox-accent'}`}
+                  className={`aspect-[4/3] border-2 rounded-3xl flex flex-col items-center justify-center gap-3 hover:scale-[1.02] transition-all group backdrop-blur-xl shadow-xl active:scale-95 ${isLightTheme ? 'bg-white/60 border-purple-200 hover:border-catbox-accent' : 'bg-catbox-panel/60 border-white/10 hover:border-catbox-accent'} ${isAngryMode ? 'border-red-500/30' : ''}`}
                 >
-                  <div className={`w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center transition-colors border ${isAngryMode ? 'bg-red-900/50 text-red-400 border-red-500' : 'bg-catbox-accent/20 group-hover:bg-catbox-accent group-hover:text-white text-catbox-accent border-white/10'}`}>
+                  <div className={`w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center transition-colors border-2 ${isAngryMode ? 'bg-red-900/50 text-red-400 border-red-500' : 'bg-catbox-accent/20 group-hover:bg-catbox-accent group-hover:text-white text-catbox-accent border-white/10'}`}>
                     <Icons.Film size={26} />
                   </div>
                   <span className="font-bold text-xs md:text-sm tracking-wide">{t.animation}</span>
@@ -409,9 +512,9 @@ const App: React.FC = () => {
 
                 <button 
                   onClick={() => setMode('photo')}
-                  className={`aspect-[4/3] bg-catbox-panel/60 border-2 rounded-3xl flex flex-col items-center justify-center gap-3 hover:scale-[1.02] transition-all group backdrop-blur-xl shadow-xl active:scale-95 ${isAngryMode ? 'border-red-500/30' : 'border-white/10 hover:border-catbox-secondary'}`}
+                  className={`aspect-[4/3] border-2 rounded-3xl flex flex-col items-center justify-center gap-3 hover:scale-[1.02] transition-all group backdrop-blur-xl shadow-xl active:scale-95 ${isLightTheme ? 'bg-white/60 border-pink-200 hover:border-catbox-secondary' : 'bg-catbox-panel/60 border-white/10 hover:border-catbox-secondary'} ${isAngryMode ? 'border-red-500/30' : ''}`}
                 >
-                  <div className={`w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center transition-colors border ${isAngryMode ? 'bg-red-900/50 text-red-400 border-red-500' : 'bg-catbox-secondary/20 group-hover:bg-catbox-secondary group-hover:text-white text-catbox-secondary border-white/10'}`}>
+                  <div className={`w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center transition-colors border-2 ${isAngryMode ? 'bg-red-900/50 text-red-400 border-red-500' : 'bg-catbox-secondary/20 group-hover:bg-catbox-secondary group-hover:text-white text-catbox-secondary border-white/10'}`}>
                     <Icons.Image size={26} />
                   </div>
                   <span className="font-bold text-xs md:text-sm tracking-wide">{t.photo}</span>
@@ -419,9 +522,9 @@ const App: React.FC = () => {
 
                  <button 
                   onClick={() => setMode('gallery')}
-                  className={`aspect-[4/3] bg-catbox-surface/40 border-2 rounded-3xl flex flex-col items-center justify-center gap-2 hover:scale-[1.02] transition-all group backdrop-blur-xl shadow-xl active:scale-95 ${isAngryMode ? 'border-red-500/30' : 'border-white/5 hover:border-yellow-400/50'}`}
+                  className={`aspect-[4/3] border-2 rounded-3xl flex flex-col items-center justify-center gap-2 hover:scale-[1.02] transition-all group backdrop-blur-xl shadow-xl active:scale-95 ${isLightTheme ? 'bg-white/40 border-yellow-200 hover:border-yellow-400' : 'bg-catbox-surface/40 border-white/5 hover:border-yellow-400/50'} ${isAngryMode ? 'border-red-500/30' : ''}`}
                 >
-                   <div className={`w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center transition-colors border ${isAngryMode ? 'bg-red-900/50 text-red-400 border-red-500' : 'bg-yellow-400/10 group-hover:bg-yellow-400 group-hover:text-black text-yellow-400 border-white/10'}`}>
+                   <div className={`w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center transition-colors border-2 ${isAngryMode ? 'bg-red-900/50 text-red-400 border-red-500' : 'bg-yellow-400/10 group-hover:bg-yellow-400 group-hover:text-black text-yellow-400 border-white/10'}`}>
                        <Icons.Folder size={22} />
                    </div>
                    <span className="font-bold text-xs md:text-sm tracking-wide">{t.folder}</span>
@@ -431,7 +534,7 @@ const App: React.FC = () => {
                   onClick={() => setMode('ai-chat')}
                   className={`md:col-span-1 p-5 border-2 rounded-3xl flex flex-col items-center justify-center gap-2 hover:scale-[1.01] transition-all group backdrop-blur-xl shadow-xl active:scale-95 ${isAngryMode ? 'bg-red-900/20 border-red-500/30' : 'bg-gradient-to-br from-blue-900/40 to-purple-900/40 border-white/10 hover:border-blue-500/50'}`}
                 >
-                   <div className={`w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center transition-colors border ${isAngryMode ? 'bg-red-900/50 text-red-400 border-red-500' : 'bg-blue-500/20 group-hover:bg-blue-500 group-hover:text-white text-blue-400 border-white/10'}`}>
+                   <div className={`w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center transition-colors border-2 ${isAngryMode ? 'bg-red-900/50 text-red-400 border-red-500' : 'bg-blue-500/20 group-hover:bg-blue-500 group-hover:text-white text-blue-400 border-white/10'}`}>
                        <Icons.Sparkles size={26} />
                    </div>
                    <div className="text-center">
@@ -518,7 +621,7 @@ const App: React.FC = () => {
                   onRedo={() => canvasRef.current?.redo()}
                   onClear={() => canvasRef.current?.clear()}
                   isPhotoMode={true}
-                  onSave={handleQuickSavePhoto} // DIRECT SAVE
+                  onSave={handleQuickSavePhoto} // DIRECT SAVE TO FOLDER
                   onOpenColorPicker={() => setShowColorPicker(true)}
                   lang={appSettings.language}
                 />
